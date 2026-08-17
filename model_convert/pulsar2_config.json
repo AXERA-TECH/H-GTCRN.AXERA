@@ -1,0 +1,56 @@
+{
+  "input": "/workspace/model_convert/model.onnx",
+  "output_dir": "/workspace/model_convert/output",
+  "output_name": "model.axmodel",
+  "work_dir": "/workspace/model_convert/output/work",
+  "model_type": "ONNX",
+  "target_hardware": "AX650",
+  "npu_mode": "NPU3",
+  "input_shapes": "feat:1x6x626x257",
+  "onnx_opt": {
+    "disable_onnx_optimization": false,
+    "enable_onnxsim": true,
+    "model_check": true
+  },
+  "quant": {
+    "input_configs": [
+      {
+        "tensor_name": "feat",
+        "calibration_dataset": "/workspace/model_convert/calib_data/feat.tar.gz",
+        "calibration_format": "Numpy",
+        "calibration_size": 6,
+        "calibration_mean": [],
+        "calibration_std": []
+      }
+    ],
+    "calibration_method": "MinMax",
+    "precision_analysis": true,
+    "precision_analysis_method": "EndToEnd",
+    "highest_mix_precision": false,
+    "layer_configs": [
+      {
+        "op_type": "GRU",
+        "data_type": "FP32"
+      },
+      {
+        "op_type": "Transpose",
+        "data_type": "FP32"
+      },
+      {
+        "start_tensor_names": ["DEFAULT"],
+        "end_tensor_names": ["DEFAULT"],
+        "data_type": "U16"
+      }
+    ]
+  },
+  "input_processors": [
+    {
+      "tensor_name": "feat",
+      "tensor_format": "RGB",
+      "tensor_layout": "NCHW",
+      "src_format": "RGB",
+      "src_dtype": "FP32",
+      "src_layout": "NCHW"
+    }
+  ]
+}

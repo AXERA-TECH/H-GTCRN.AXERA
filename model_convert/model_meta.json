@@ -1,0 +1,33 @@
+{
+  "model_name": "H-GTCRN-core",
+  "framework": "pytorch",
+  "route": "general_split",
+  "split_note": "CPU computes STFT/WPE/IVA/features and ISTFT; AXMODEL runs GTCRN neural core feat->mask.",
+  "inputs": [
+    {
+      "name": "feat",
+      "shape": [
+        1,
+        6,
+        626,
+        257
+      ],
+      "dtype": "float32",
+      "layout": "NCHW"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "mask",
+      "shape": [
+        1,
+        2,
+        626,
+        257
+      ],
+      "dtype": "float32"
+    }
+  ],
+  "opset": 17,
+  "torch_onnx_cosine": 0.9999999999996632
+}

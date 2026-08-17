@@ -1,0 +1,27 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+build/
+build_*/
+dist/
+*.egg-info/
+
+origin/
+model_convert/output/
+model_convert/calib_data/
+model_convert/sample_input.*
+model_convert/source_output.*
+models/
+output/
+*.axmodel
+*.npy
+*.bin
+*.tar.gz
+
+# C++ 编译产物与工具链（工具链下载方式见 cpp/README.md）
+cpp/bin/
+cpp/toolchains/
