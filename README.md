@@ -1,57 +1,51 @@
-# H-GTCRN AX650 Export
+# H-GTCRN.AXERA
 
-[H-GTCRN](https://github.com/Max1Wz/H-GTCRN) neural core export and Pulsar2
-quantization project for AX650/NPU3.
+[H-GTCRN](https://github.com/Max1Wz/H-GTCRN) 语音增强神经核的 AX650/NPU3 导出与量化工程。
 
-This repository exports only the GTCRN neural core. The AXMODEL interface is
-`feat -> mask`; STFT, WPE, IVA, feature construction, mask application, and
-ISTFT stay on the CPU side.
+本仓库只导出 GTCRN 神经核（`feat → mask`）；STFT/WPE/IVA、特征构造、掩码应用与
+ISTFT 保留在 CPU 侧。
 
-## Model
+## 模型
 
-| Model | Input | Output | Python RTF | C++ RTF |
-|---|---|---|:---:|:---:|
-| H-GTCRN-core | `feat[1,6,626,257]` | `mask[1,2,626,257]` | 0.002114 | 0.002012 |
+| 模型 | 输入 | 输出 | Python RTF | C++ RTF |
+|------|------|------|:--:|:--:|
+| H-GTCRN-core | `feat[1,6,626,257]` | `mask[1,2,626,257]` | 0.0021 | 0.0020 |
 
-> RTF = NPU core inference time / 10.0 s sample audio duration. CPU STFT/WPE/IVA
-> and ISTFT are not included in the RTF number.
-
-| Metric | Value |
-|---|---|
-| Target | AX650/NPU3 |
+| 指标 | 值 |
+|------|-----|
+| 目标芯片 | AX650/NPU3 |
 | ONNX opset | 17 |
 | Torch/ONNX cosine | 1.000000119 |
-| Quant output cosine | 0.99907 |
-| Board/reference mask cosine | 0.99876 |
-| Board/reference audio cosine | 0.999468371 |
-| Python/C++ output cosine | 1.0 |
+| 量化输出 cosine | 0.99907 |
+| 板端 vs PyTorch mask cosine | 0.99876 |
+| Python/C++ 输出 cosine | 1.0 |
 
-## Directory
+> RTF = NPU 推理时间 / 10s 音频时长，AX650 板端实测。
 
-```text
+## 目录结构
+
+```
 h-gtcrn-ax650-export/
-├── python/                 # pyaxengine SDK and example
-├── cpp/                    # AX Engine C++ SDK（含 toolchains/ 交叉编译配置）
-├── model_convert/          # 静态 ONNX + Pulsar2 配置（校准数据由脚本生成，不入库）
+├── python/                 # pyaxengine SDK 与示例
+├── cpp/                    # C++ SDK（含 download_toolchains.sh）
+├── model_convert/          # 导出脚本 + 静态 ONNX + Pulsar2 配置
 │   ├── scripts/export_core_onnx.py
 │   ├── model.onnx
 │   ├── model_meta.json
 │   ├── pulsar2_config.json
 │   └── compile_pulsar2.sh
-├── samples/                # noisy wav and enhanced wav examples
-├── reports/                # conversion, simulation, board reports
+├── samples/                # 带噪/增强对比音频
+├── reports/                # 导出/编译/仿真/板端报告
 └── README.md
 ```
 
-## Re-export ONNX
-
-Clone the upstream source and prepare the checkpoint under `origin/H-GTCRN`:
+## 步骤 1：获取原始模型
 
 ```bash
 git clone --depth 1 https://github.com/Max1Wz/H-GTCRN.git origin/H-GTCRN
 ```
 
-The exporter expects:
+导出脚本需要：
 
 ```text
 origin/H-GTCRN/gtcrn_iva.py
@@ -59,47 +53,37 @@ origin/H-GTCRN/checkpoints/best_model_0121.tar
 origin/H-GTCRN/samples/
 ```
 
-Then run:
+## 步骤 2：导出 ONNX
 
 ```bash
 python3 model_convert/scripts/export_core_onnx.py
 ```
 
-The script writes `model_convert/model.onnx`, `model_convert/model_meta.json`,
-`model_convert/sample_input.npy`, `model_convert/source_output.npy`, and
-`model_convert/calib_data/feat.tar.gz`. 这些数据产物由脚本生成、不入库
+产物：`model_convert/model.onnx`、`model_meta.json`、`sample_input.npy`、
+`source_output.npy`、`calib_data/feat.tar.gz`。数据产物由脚本生成、不入库
 （`.gitignore` 已排除），重新导出即可复现。
 
-LayerNormalization is exported through a flattening wrapper so the ONNX
-LayerNormalization axis remains `-1`.
+## 步骤 3：生成校准数据
 
-## Compile AXMODEL
+校准特征包 `calib_data/feat.tar.gz` 由上一步自动生成（真实语音特征）。
 
-The included config targets AX650/NPU3. It uses U16 graph quantization and keeps
-`GRU` and `Transpose` in FP32 to avoid the AX650 U8 transpose tiling failure.
+## 步骤 4：Pulsar2 量化
 
 ```bash
 bash model_convert/compile_pulsar2.sh
 ```
 
-The output is written to:
-
-```text
-model_convert/output/model.axmodel
-```
-
-The known-good Pulsar2 image is:
+产物：`model_convert/output/model.axmodel`。配置要点：U16 图量化，
+GRU/Transpose 保持 FP32（规避 AX650 U8 transpose tiling 问题），
+`highest_mix_precision=false`。已知可用镜像：
 
 ```text
 docker-registry.aitsw.axera-tech.com/pulsar2:20260724-temp-5939101d
 ```
 
-## Python SDK
-
-On an AX650 board:
+## Python SDK 板端推理
 
 ```bash
-export LD_LIBRARY_PATH=/soc/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
 export PYTHONPATH=$PWD/python${PYTHONPATH:+:$PYTHONPATH}
 pip install -r python/requirements.txt
 
@@ -111,74 +95,44 @@ python3 python/h_gtcrn_core_sdk/example.py \
   --audio-seconds 10.0
 ```
 
-The SDK accepts a precomputed feature tensor and returns the raw mask tensor.
-
-The audio demo takes the bundled noisy wav and a precomputed feature tensor,
-runs the NPU core, applies the returned mask, and writes an enhanced wav:
-
-```bash
-pip install torch soundfile
-python3 python/audio_demo.py \
-  --model model_convert/output/model.axmodel \
-  --input-wav samples/Samples1_noisy.wav \
-  --feat model_convert/sample_input.npy \
-  --output samples/Samples1_board_enhanced.wav
-```
-
 ## C++ SDK
 
-The C++ SDK wraps AX Engine input/output allocation and named tensor execution.
-
-一键下载交叉编译工具链（Arm GNU 9.2 + AX650 BSP SDK，放到 `cpp/toolchains/`，不入库）：
+交叉编译工具链一键下载（Arm GNU 9.2 + AX650 BSP，放到 `cpp/toolchains/`，不入库）：
 
 ```bash
 bash cpp/download_toolchains.sh
+bash cpp/build_ax650.sh        # -> cpp/bin/h_gtcrn_ax650
 ```
 
-或手动准备（已装系统 `aarch64-linux-gnu-g++` 或已有工具链时）：
+板端运行：
 
 ```bash
-wget https://developer.arm.com/-/media/Files/downloads/gnu-a/9.2-2019.12/binrel/gcc-arm-9.2-2019.12-x86_64-aarch64-none-linux-gnu.tar.xz
-tar -xf gcc-arm-9.2-2019.12-x86_64-aarch64-none-linux-gnu.tar.xz
-export TOOLCHAIN_ROOT=$(pwd)/gcc-arm-9.2-2019.12-x86_64-aarch64-none-linux-gnu
-
-git clone https://github.com/AXERA-TECH/ax650n_bsp_sdk.git --depth=1
-export BSP_MSP_DIR=$(pwd)/ax650n_bsp_sdk/msp/out
-
-bash cpp/build_ax650.sh        # -> cpp/bin/h_gtcrn_ax650
-LD_LIBRARY_PATH=/soc/lib ./cpp/bin/h_gtcrn_ax650 \
+./cpp/bin/h_gtcrn_ax650 \
   model_convert/output/model.axmodel \
   model_convert/sample_input.bin \
-  cpp_output \
+  output \
   --bench 20 \
   --audio-seconds 10.0
 ```
 
-`sample_input.bin` 由 `scripts/export_core_onnx.py` 生成（或从
+`sample_input.bin` 由 `sample_input.npy` 转换而来（`numpy tofile`），也可从
 [H-GTCRN.AXERA HuggingFace](https://huggingface.co/AXERA-TECH/H-GTCRN.AXERA)
-仓库 `examples/` 目录获取）。详见 `cpp/README.md`。
+仓库 `examples/` 获取。板端运行库在 `/soc/lib`，系统已配置搜索路径，直接运行
+即可；如提示找不到 `libax_*.so` 再加
+`export LD_LIBRARY_PATH=/soc/lib:${LD_LIBRARY_PATH:-}`。详见 `cpp/README.md`。
 
-## Example Audio
+## 示例音频
 
-- `samples/Samples1_noisy.wav`: original noisy 16 kHz two-channel input
-- `samples/Samples1_core_ref_enhanced.wav`: legacy ONNX enhanced wav before the ConvTranspose+BN export fix
-- `samples/Samples1_board_enhanced.wav`: AX650 board enhanced wav generated by the official `GTCRN_IVA` CPU chain plus NPU core
+- `samples/Samples1_noisy.wav` — 原始 16kHz 双通道带噪输入（RMS 0.09499）
+- `samples/Samples1_board_enhanced.wav` — AX650 板端增强输出（RMS 0.02932）
+- `samples/Samples1_core_ref_enhanced.wav` — ONNX 参考增强输出
 
-For this sample, input RMS is `0.09499`; AX650 enhanced output RMS is `0.02932`.
+## 报告
 
-## Reports
+`reports/` 下有完整的导出/编译/仿真/板端/性能/自测报告。
 
-Detailed validation records are in `reports/`:
+## 参考
 
-- `export_report.md`
-- `compile_report.md`
-- `simulate_report.md`
-- `runonboard_report.md`
-- `performance_report.md`
-- `package_self_test.md`
-
-## References
-
-- Upstream model: <https://github.com/Max1Wz/H-GTCRN>
-- H-GTCRN.AXERA (HuggingFace 预编译模型+SDK): <https://huggingface.co/AXERA-TECH/H-GTCRN.AXERA>
-- Magnetar: <https://github.com/AXERA-TECH/Magnetar>
+- [H-GTCRN](https://github.com/Max1Wz/H-GTCRN) — 原始模型
+- [H-GTCRN.AXERA（HuggingFace 预编译模型+SDK）](https://huggingface.co/AXERA-TECH/H-GTCRN.AXERA)
+- [Magnetar](https://github.com/AXERA-TECH/Magnetar) — AXERA 模型部署工具链
