@@ -83,10 +83,21 @@ docker-registry.aitsw.axera-tech.com/pulsar2:20260724-temp-5939101d
 
 ## Python SDK 板端推理
 
+`python/audio_demo.py` 为 wav→wav demo（numpy 实现 CPU 链路，依赖仅 numpy + pyaxengine）：
+
 ```bash
 export PYTHONPATH=$PWD/python${PYTHONPATH:+:$PYTHONPATH}
 pip install -r python/requirements.txt
 
+python3 python/audio_demo.py \
+  --model model_convert/output/model.axmodel \
+  --input-wav samples/Samples1_noisy.wav \
+  --output samples/Samples1_board_enhanced.wav
+```
+
+core-only 接口（feat → mask）：
+
+```bash
 python3 python/h_gtcrn_core_sdk/example.py \
   --model model_convert/output/model.axmodel \
   --input model_convert/sample_input.npy \
@@ -97,6 +108,9 @@ python3 python/h_gtcrn_core_sdk/example.py \
 
 ## C++ SDK
 
+C++ 二进制支持 **wav → wav 端到端**（CPU: STFT/WPE/IVA/ISTFT，NPU: GTCRN 核），
+也保留原 feat.bin → mask.bin 的 core-only 模式。
+
 交叉编译工具链一键下载（Arm GNU 9.2 + AX650 BSP，放到 `cpp/toolchains/`，不入库）：
 
 ```bash
@@ -104,17 +118,18 @@ bash cpp/download_toolchains.sh
 bash cpp/build_ax650.sh        # -> cpp/bin/h_gtcrn_ax650
 ```
 
-板端运行：
+板端运行（wav→wav，16kHz PCM16，1/2 声道，长度 ≤ 10.0s 自动补零）：
 
 ```bash
 ./cpp/bin/h_gtcrn_ax650 \
   model_convert/output/model.axmodel \
-  model_convert/sample_input.bin \
-  output \
+  samples/Samples1_noisy.wav \
+  output_enhanced.wav \
   --bench 20 \
   --audio-seconds 10.0
 ```
 
+core-only 模式（原接口）：`./cpp/bin/h_gtcrn_ax650 model.axmodel sample_input.bin output --bench 20`。
 `sample_input.bin` 由 `sample_input.npy` 转换而来（`numpy tofile`），也可从
 [H-GTCRN.AXERA HuggingFace](https://huggingface.co/AXERA-TECH/H-GTCRN.AXERA)
 仓库 `examples/` 获取。板端运行库在 `/soc/lib`，系统已配置搜索路径，直接运行

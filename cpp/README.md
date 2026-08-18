@@ -46,6 +46,19 @@ cmake --build build_ax650
 
 ## 板端运行
 
+wav → wav 端到端（16kHz PCM16，1/2 声道，长度 ≤ 10.0s 自动补零）：
+
+```bash
+LD_LIBRARY_PATH=/soc/lib ./bin/h_gtcrn_ax650 \
+  models/model.axmodel \
+  samples/Samples1_noisy.wav \
+  output_enhanced.wav \
+  --bench 20 \
+  --audio-seconds 10.0
+```
+
+core-only 模式（原接口，feat.bin → mask.bin）：
+
 ```bash
 LD_LIBRARY_PATH=/soc/lib ./bin/h_gtcrn_ax650 \
   models/model.axmodel \
@@ -55,5 +68,7 @@ LD_LIBRARY_PATH=/soc/lib ./bin/h_gtcrn_ax650 \
   --audio-seconds 10.0
 ```
 
-AX650 板端实测：20 次平均 20.123 ms，core RTF 0.002012，与 Python SDK
-输出 cosine 1.0。
+CPU 链路（`src/audio_chain.hpp`，与 python/audio_demo.py 逐式对齐）：
+STFT → WPE → auxIVA → 特征构造 → [NPU] → 掩码应用 → ISTFT。
+AX650 板端实测：C++ 输出与 torch 链参考 cosine 0.99999，与 Python SDK 输出
+cosine 1.0；core RTF 0.0020，CPU 链路约 9.5s/10s 音频（WPE 统计为整段算法）。
