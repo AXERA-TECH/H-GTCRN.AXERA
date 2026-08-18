@@ -70,5 +70,16 @@ LD_LIBRARY_PATH=/soc/lib ./bin/h_gtcrn_ax650 \
 
 CPU 链路（`src/audio_chain.hpp`，与 python/audio_demo.py 逐式对齐）：
 STFT → WPE → auxIVA → 特征构造 → [NPU] → 掩码应用 → ISTFT。
-AX650 板端实测：C++ 输出与 torch 链参考 cosine 0.99999，与 Python SDK 输出
-cosine 1.0；core RTF 0.0020，CPU 链路约 9.5s/10s 音频（WPE 统计为整段算法）。
+
+## 性能（AX650 板端实测）
+
+| 指标 | 值 |
+|------|-----|
+| 端到端 RTF（CPU 链路 + NPU）/ 10s 音频 | ~0.36（CPU 3.6s + NPU 23ms） |
+| NPU core RTF | 0.0023 |
+| 输出 vs torch 链参考 cosine | 0.99999 |
+| 输出 vs Python SDK cosine | 1.0 |
+
+端到端耗时由 CPU 链路主导：WPE（每频点 36×36 矩阵求逆的整段统计）与
+auxIVA（10 轮迭代）是整段离线算法，与上游 GTCRN_IVA 一致，非流式；
+如需实时需改造为在线分块算法。
